@@ -4,6 +4,7 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
+mod api;
 
 #[derive(Serialize)]
 struct Message {
@@ -13,7 +14,8 @@ struct Message {
 async fn async_main() {
     let app = Router::new()
         .route("/", get(handler))
-        .route("/json", get(handler2));
+        .route("/json", get(handler2))
+        .route("/api/notice", api::notice::notice_router());
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
