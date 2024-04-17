@@ -15,6 +15,7 @@ fn api_v1() -> Router {
     Router::new()
         .route("/notice", api::notice::notice_router())
         .merge(api::auth::router())
+        .merge(api::player::router())
 }
 
 async fn async_main() {
