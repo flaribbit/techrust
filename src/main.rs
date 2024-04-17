@@ -3,7 +3,7 @@ use axum::{
     routing::get,
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 mod api;
 
 #[derive(Serialize)]
@@ -11,11 +11,17 @@ struct Message {
     message: String,
 }
 
+fn api_v1() -> Router {
+    Router::new()
+        .route("/notice", api::notice::notice_router())
+        .merge(api::auth::router())
+}
+
 async fn async_main() {
     let app = Router::new()
         .route("/", get(handler))
         .route("/json", get(handler2))
-        .route("/api/notice", api::notice::notice_router());
+        .nest("/techmino/api/v1", api_v1());
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
