@@ -13,7 +13,7 @@ struct Message {
 
 fn api_v1() -> Router {
     Router::new()
-        .route("/notice", api::notice::notice_router())
+        .merge(api::notice::router())
         .merge(api::auth::router())
         .merge(api::player::router())
 }

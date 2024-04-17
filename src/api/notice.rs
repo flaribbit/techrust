@@ -78,6 +78,9 @@ async fn api_put(extract::Json(_payload): extract::Json<PostNotice>) -> Json<Del
     Json(DeleteNoticeResponse { code: 200 })
 }
 
-pub fn notice_router() -> MethodRouter {
-    get(api_get).post(api_post).delete(api_delete).put(api_put)
+pub fn router() -> Router {
+    Router::new().route(
+        "/notice",
+        get(api_get).post(api_post).delete(api_delete).put(api_put),
+    )
 }
