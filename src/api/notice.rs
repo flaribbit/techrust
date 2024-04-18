@@ -1,11 +1,6 @@
-#![allow(non_snake_case, dead_code, unused_imports)]
+// #![allow(non_snake_case, dead_code, unused_imports)]
 
-use axum::{
-    extract,
-    response::Json,
-    routing::{get, MethodRouter},
-    Router,
-};
+use axum::{routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -50,7 +45,7 @@ struct Notice {
     content: String,
 }
 
-async fn api_get(extract::Json(_payload): extract::Json<GetNotice>) -> Json<GetNoticeResponse> {
+async fn api_get(Json(_payload): Json<GetNotice>) -> Json<GetNoticeResponse> {
     // TODO: process the payload
     Json(GetNoticeResponse {
         code: 200,
@@ -62,19 +57,17 @@ async fn api_get(extract::Json(_payload): extract::Json<GetNotice>) -> Json<GetN
     })
 }
 
-async fn api_post(extract::Json(_payload): extract::Json<PostNotice>) -> Json<PostNoticeResponse> {
+async fn api_post(Json(_payload): Json<PostNotice>) -> Json<PostNoticeResponse> {
     // TODO: process the payload
     Json(PostNoticeResponse { noticeId: 0 })
 }
 
-async fn api_delete(
-    extract::Json(_payload): extract::Json<DeleteNotice>,
-) -> Json<DeleteNoticeResponse> {
+async fn api_delete(Json(_payload): Json<DeleteNotice>) -> Json<DeleteNoticeResponse> {
     // TODO: process the payload
     Json(DeleteNoticeResponse { code: 200 })
 }
 
-async fn api_put(extract::Json(_payload): extract::Json<PostNotice>) -> Json<DeleteNoticeResponse> {
+async fn api_put(Json(_payload): Json<PostNotice>) -> Json<DeleteNoticeResponse> {
     Json(DeleteNoticeResponse { code: 200 })
 }
 
