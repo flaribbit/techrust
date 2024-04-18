@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 mod api;
+mod ws;
 
 #[derive(Serialize)]
 struct Message {
