@@ -1,9 +1,9 @@
 pub mod response;
+use crate::common::AppState;
 use axum::extract::{
     ws::{Message, WebSocket, WebSocketUpgrade},
     State,
 };
-pub use response::AppState;
 use std::sync::Arc;
 
 pub async fn handler(
@@ -20,7 +20,7 @@ async fn websocket(stream: WebSocket, state: Arc<AppState>) {
         if let Message::Text(text) = message {
             println!("received: {}", text);
             match serde_json::from_str(&text) {
-                Ok(json) => handle_message(&json, &state, &sender),
+                Ok(json) => handle_message(&json, &state, &mut sender).await,
                 Err(e) => println!("error: {}", e),
             }
         }
@@ -30,12 +30,12 @@ async fn websocket(stream: WebSocket, state: Arc<AppState>) {
 }
 
 type Sender = futures_util::stream::SplitSink<WebSocket, Message>;
-fn handle_message(json: &serde_json::Value, state: &Arc<AppState>, sender: &Sender) {
+async fn handle_message(json: &serde_json::Value, state: &Arc<AppState>, sender: &mut Sender) {
     let action_id = json["action_id"].as_i64().unwrap_or_default();
     macro_rules! handlers {
         ($($key:expr => $value:ident),* $(,)?) => {
             match action_id {
-                $( $key => $value(json, state, sender), )*
+                $( $key => $value(json, state, sender).await, )*
                 _ => println!("unknown action_id: {}", action_id),
             }
         };

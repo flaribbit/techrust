@@ -5,6 +5,7 @@ use axum::{
 };
 use serde::Serialize;
 mod api;
+mod common;
 mod ws;
 
 #[derive(Serialize)]
@@ -21,7 +22,7 @@ fn api_v1() -> Router {
 
 async fn async_main() {
     use std::sync::Arc;
-    let app_state = Arc::new(ws::AppState::new());
+    let app_state = Arc::new(common::AppState::new());
     let app = Router::new()
         .route("/", get(handler))
         .route("/json", get(handler2))

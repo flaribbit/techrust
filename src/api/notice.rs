@@ -1,5 +1,4 @@
-// #![allow(non_snake_case, dead_code, unused_imports)]
-
+#![allow(non_snake_case)]
 use axum::{routing::get, Json, Router};
 use serde::{Deserialize, Serialize};
 
