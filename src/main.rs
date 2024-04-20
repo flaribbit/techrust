@@ -20,9 +20,13 @@ fn api_v1() -> Router {
 }
 
 async fn async_main() {
+    use std::sync::Arc;
+    let app_state = Arc::new(ws::AppState::new());
     let app = Router::new()
         .route("/", get(handler))
         .route("/json", get(handler2))
+        .route("/techmino/ws/v1", get(ws::handler))
+        .with_state(app_state)
         .nest("/techmino/api/v1", api_v1());
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
