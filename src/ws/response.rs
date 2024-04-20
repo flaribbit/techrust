@@ -1,40 +1,67 @@
-use crate::common::AppState;
-use axum::extract::ws::{Message, WebSocket};
+use crate::common::{AppState, MessageData, Sender};
+use axum::extract::ws::Message;
 use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
-type Sender = futures_util::stream::SplitSink<WebSocket, Message>;
-
-async fn send_json(sender: &mut Sender, json: serde_json::Value) {
+pub async fn sender_task(state: Arc<AppState>, rx: std::sync::mpsc::Receiver<MessageData>) {
     use futures_util::SinkExt;
-    let message = Message::Text(serde_json::to_string(&json).unwrap());
-    sender.send(message).await.unwrap();
+    while let Ok(MessageData { player_id, message }) = rx.recv() {
+        println!("send message to player: {}", player_id);
+        let message = Message::Text(message);
+        let user_sender = state
+            .online_users
+            .lock()
+            .unwrap()
+            .get(&player_id)
+            .map(|user| user.sender.clone());
+        // 这个锁搞不好会一直锁着全局状态
+        if let Some(sender) = user_sender {
+            sender.lock().await.send(message).await.unwrap();
+        }
+    }
 }
 
-pub async fn global_online_count(_json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+fn send_json(state: &AppState, json: serde_json::Value) {
+    let message = Message::Text(json.to_string());
+    state
+        .tx
+        .send(MessageData {
+            player_id: 0,
+            message: json.to_string(),
+        })
+        .unwrap();
+}
+
+pub fn global_online_count(
+    _json: &serde_json::Value,
+    state: &AppState,
+    sender: &Arc<Mutex<Sender>>,
+) {
     let count = state.online_users.lock().unwrap().len();
     let data = json!({
         "action": 1000,
         "errno": 0,
         "data": count
     });
-    send_json(sender, data).await;
+    send_json(state, data);
 }
 
-pub async fn match_end(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn match_end(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let data = json!({
         "action": 1100,
         "errno": 0
     });
 }
 
-pub async fn match_ready(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn match_ready(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let data = json!({
         "action": 1101,
         "errno": 0
     });
 }
 
-pub async fn match_start(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn match_start(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let seed = json["seed"].as_i64().unwrap_or_default();
     let data = json!({
         "action": 1102,
@@ -45,7 +72,7 @@ pub async fn match_start(json: &serde_json::Value, state: &AppState, sender: &mu
     });
 }
 
-pub async fn player_config(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn player_config(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let data = json!({
         "action": 1200,
@@ -57,7 +84,7 @@ pub async fn player_config(json: &serde_json::Value, state: &AppState, sender: &
     });
 }
 
-pub async fn player_finish(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn player_finish(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let data = json!({
         "action": 1201,
         "errno": 0,
@@ -68,7 +95,7 @@ pub async fn player_finish(json: &serde_json::Value, state: &AppState, sender: &
     });
 }
 
-pub async fn player_group(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn player_group(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let group_id = json["group"].as_i64().unwrap_or_default();
     let data = json!({
@@ -81,7 +108,7 @@ pub async fn player_group(json: &serde_json::Value, state: &AppState, sender: &m
     });
 }
 
-pub async fn player_ready(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn player_ready(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let is_ready = json["isReady"].as_bool().unwrap_or_default();
     let data = json!({
@@ -94,7 +121,7 @@ pub async fn player_ready(json: &serde_json::Value, state: &AppState, sender: &m
     });
 }
 
-pub async fn player_role(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn player_role(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let role = json["role"].as_str().unwrap_or_default();
     let data = json!({
@@ -107,7 +134,7 @@ pub async fn player_role(json: &serde_json::Value, state: &AppState, sender: &mu
     });
 }
 
-pub async fn player_state(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn player_state(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let state = json["customState"].as_str().unwrap_or_default();
     let data = json!({
@@ -120,7 +147,7 @@ pub async fn player_state(json: &serde_json::Value, state: &AppState, sender: &m
     });
 }
 
-pub async fn player_stream(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn player_stream(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let stream = json["stream"].as_str().unwrap_or_default();
     let data = json!({
@@ -133,7 +160,7 @@ pub async fn player_stream(json: &serde_json::Value, state: &AppState, sender: &
     });
 }
 
-pub async fn player_type(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn player_type(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let player_type = json["type"].as_str().unwrap_or_default();
     let data = json!({
@@ -146,7 +173,7 @@ pub async fn player_type(json: &serde_json::Value, state: &AppState, sender: &mu
     });
 }
 
-pub async fn room_chat(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_chat(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let message = json["message"].as_str().unwrap_or_default();
     let data = json!({
@@ -159,7 +186,7 @@ pub async fn room_chat(json: &serde_json::Value, state: &AppState, sender: &mut 
     });
 }
 
-pub async fn room_create(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_create(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let data = json!({
         "action": 1301,
         "errno": 0,
@@ -167,7 +194,7 @@ pub async fn room_create(json: &serde_json::Value, state: &AppState, sender: &mu
     });
 }
 
-pub async fn room_data_get(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_data_get(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let data = json!({
         "action": 1302,
         "errno": 0,
@@ -175,7 +202,7 @@ pub async fn room_data_get(json: &serde_json::Value, state: &AppState, sender: &
     });
 }
 
-pub async fn room_data_update(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_data_update(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let data = json!({
         "action": 1303,
@@ -187,7 +214,7 @@ pub async fn room_data_update(json: &serde_json::Value, state: &AppState, sender
     });
 }
 
-pub async fn room_info_get(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_info_get(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let data = json!({
         "action": 1304,
         "errno": 0,
@@ -195,7 +222,7 @@ pub async fn room_info_get(json: &serde_json::Value, state: &AppState, sender: &
     });
 }
 
-pub async fn room_info_update(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_info_update(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let data = json!({
         "action": 1305,
@@ -208,7 +235,7 @@ pub async fn room_info_update(json: &serde_json::Value, state: &AppState, sender
     });
 }
 
-pub async fn room_join(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_join(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let data = json!({
         "action": 1306,
         "errno": 0,
@@ -217,7 +244,7 @@ pub async fn room_join(json: &serde_json::Value, state: &AppState, sender: &mut 
     });
 }
 
-pub async fn room_kick(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_kick(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let executor_id = json["executorId"].as_i64().unwrap_or_default();
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let data = json!({
@@ -230,7 +257,7 @@ pub async fn room_kick(json: &serde_json::Value, state: &AppState, sender: &mut 
     });
 }
 
-pub async fn room_leave(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_leave(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let data = json!({
         "action": 1308,
@@ -242,7 +269,7 @@ pub async fn room_leave(json: &serde_json::Value, state: &AppState, sender: &mut
     });
 }
 
-pub async fn room_list(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_list(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     // TODO
     let data = json!({
         "action": 1309,
@@ -250,7 +277,7 @@ pub async fn room_list(json: &serde_json::Value, state: &AppState, sender: &mut 
     });
 }
 
-pub async fn room_password(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_password(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
     let password = json["password"].as_str().unwrap_or_default();
     let data = json!({
@@ -263,7 +290,7 @@ pub async fn room_password(json: &serde_json::Value, state: &AppState, sender: &
     });
 }
 
-pub async fn room_remove(json: &serde_json::Value, state: &AppState, sender: &mut Sender) {
+pub fn room_remove(json: &serde_json::Value, state: &AppState, sender: &Arc<Mutex<Sender>>) {
     let data = json!({
         "action": 1311,
         "errno": 0

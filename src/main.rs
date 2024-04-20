@@ -22,7 +22,10 @@ fn api_v1() -> Router {
 
 async fn async_main() {
     use std::sync::Arc;
-    let app_state = Arc::new(common::AppState::new());
+    let (app_state, rx) = common::AppState::new();
+    let app_state = Arc::new(app_state);
+    let state2 = app_state.clone();
+    let state3 = app_state.clone();
     let app = Router::new()
         .route("/", get(handler))
         .route("/json", get(handler2))
@@ -34,11 +37,23 @@ async fn async_main() {
         .await
         .unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
+    tokio::spawn(ws::response::sender_task(state2, rx));
+    tokio::spawn(async move {
+        loop {
+            let data = common::MessageData {
+                player_id: 0,
+                message: "hello".to_string(),
+            };
+            state3.tx.send(data).unwrap();
+            println!("send message");
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    });
     axum::serve(listener, app).await.unwrap();
 }
 
 fn main() {
-    tokio::runtime::Builder::new_current_thread()
+    tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()

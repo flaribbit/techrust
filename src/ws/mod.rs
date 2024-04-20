@@ -1,5 +1,5 @@
 pub mod response;
-use crate::common::AppState;
+use crate::common::{AppState, User};
 use axum::extract::{
     ws::{Message, WebSocket, WebSocketUpgrade},
     State,
@@ -15,12 +15,21 @@ pub async fn handler(
 
 async fn websocket(stream: WebSocket, state: Arc<AppState>) {
     use futures_util::stream::StreamExt;
-    let (mut sender, mut receiver) = stream.split();
+    let (sender, mut receiver) = stream.split();
+    let sender = Arc::new(tokio::sync::Mutex::new(sender));
+    state.online_users.lock().unwrap().insert(
+        0,
+        User {
+            id: 0,
+            name: "test".to_string(),
+            sender: sender.clone(),
+        },
+    );
     while let Some(Ok(message)) = receiver.next().await {
         if let Message::Text(text) = message {
             println!("received: {}", text);
             match serde_json::from_str(&text) {
-                Ok(json) => handle_message(&json, &state, &mut sender).await,
+                Ok(json) => handle_message(&json, &state, &sender),
                 Err(e) => println!("error: {}", e),
             }
         }
@@ -30,12 +39,16 @@ async fn websocket(stream: WebSocket, state: Arc<AppState>) {
 }
 
 type Sender = futures_util::stream::SplitSink<WebSocket, Message>;
-async fn handle_message(json: &serde_json::Value, state: &Arc<AppState>, sender: &mut Sender) {
+fn handle_message(
+    json: &serde_json::Value,
+    state: &Arc<AppState>,
+    sender: &Arc<tokio::sync::Mutex<Sender>>,
+) {
     let action_id = json["action_id"].as_i64().unwrap_or_default();
     macro_rules! handlers {
         ($($key:expr => $value:ident),* $(,)?) => {
             match action_id {
-                $( $key => $value(json, state, sender).await, )*
+                $( $key => $value(json, state, sender), )*
                 _ => println!("unknown action_id: {}", action_id),
             }
         };
