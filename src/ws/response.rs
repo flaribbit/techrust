@@ -1,4 +1,4 @@
-use crate::common::{AppState, Room, WSSender};
+use crate::common::{AppState, WSSender};
 use axum::extract::ws::Message;
 use serde_json::{json, Value};
 
@@ -129,6 +129,7 @@ pub fn player_ready(json: &Value, state: &AppState, id: i32, sender: &WSSender) 
             "isReady": is_ready
         }
     });
+    send_room(id, state, &data);
 }
 
 pub fn player_role(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -142,19 +143,21 @@ pub fn player_role(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
             "role": role
         }
     });
+    send_room(id, state, &data);
 }
 
 pub fn player_state(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
     let player_id = json["playerId"].as_i64().unwrap_or_default();
-    let state = json["customState"].as_str().unwrap_or_default();
+    let custom_state = json["customState"].as_str().unwrap_or_default();
     let data = json!({
         "action": 1205,
         "errno": 0,
         "data": {
             "playerId": player_id,
-            "customState": state
+            "customState": custom_state
         }
     });
+    send_room(id, state, &data);
 }
 
 pub fn player_stream(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -168,6 +171,7 @@ pub fn player_stream(json: &Value, state: &AppState, id: i32, sender: &WSSender)
             "stream": stream
         }
     });
+    send_others(id, state, &data);
 }
 
 pub fn player_type(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -181,6 +185,7 @@ pub fn player_type(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
             "type": player_type
         }
     });
+    send_room(id, state, &data);
 }
 
 pub fn room_chat(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -194,6 +199,7 @@ pub fn room_chat(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
             "message": message
         }
     });
+    send_room(id, state, &data);
 }
 
 pub fn room_create(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -202,6 +208,7 @@ pub fn room_create(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
         "errno": 0,
         // TODO: Implement
     });
+    send_json(sender, &data);
 }
 
 pub fn room_data_get(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -210,6 +217,7 @@ pub fn room_data_get(json: &Value, state: &AppState, id: i32, sender: &WSSender)
         "errno": 0,
         "data": json["data"]
     });
+    send_json(sender, &data);
 }
 
 pub fn room_data_update(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -222,6 +230,7 @@ pub fn room_data_update(json: &Value, state: &AppState, id: i32, sender: &WSSend
             "data": json["data"],
         }
     });
+    send_room(id, state, &data);
 }
 
 pub fn room_info_get(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -252,6 +261,8 @@ pub fn room_join(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
         // TODO
         "data": ""
     });
+    send_json(sender, &data);
+    send_others(id, state, &data);
 }
 
 pub fn room_kick(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -265,6 +276,8 @@ pub fn room_kick(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
             "playerId": player_id
         }
     });
+    send_json(sender, &data);
+    send_others(id, state, &data);
 }
 
 pub fn room_leave(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -277,6 +290,7 @@ pub fn room_leave(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
             "playerId": player_id
         }
     });
+    send_others(id, state, &data);
 }
 
 pub fn room_list(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
@@ -285,6 +299,7 @@ pub fn room_list(json: &Value, state: &AppState, id: i32, sender: &WSSender) {
         "action": 1309,
         "errno": 0
     });
+    send_json(sender, &data);
 }
 
 pub fn room_password(json: &Value, state: &AppState, id: i32, sender: &WSSender) {

@@ -1,17 +1,7 @@
-use axum::{
-    response::{Html, Json},
-    routing::get,
-    Router,
-};
-use serde::Serialize;
+use axum::{response::Html, routing::get, Router};
 mod api;
 mod common;
 mod ws;
-
-#[derive(Serialize)]
-struct Message {
-    message: String,
-}
 
 fn api_v1() -> Router {
     Router::new()
@@ -25,7 +15,6 @@ async fn async_main() {
     let app_state = Arc::new(common::AppState::new());
     let app = Router::new()
         .route("/", get(handler))
-        .route("/json", get(handler2))
         .route("/techmino/ws/v1", get(ws::handler))
         .with_state(app_state)
         .nest("/techmino/api/v1", api_v1());
@@ -47,10 +36,4 @@ fn main() {
 
 async fn handler() -> Html<&'static str> {
     Html("<h1>Hello, World!</h1>")
-}
-
-async fn handler2() -> Json<Message> {
-    Json(Message {
-        message: "Hello, World!".to_string(),
-    })
 }
