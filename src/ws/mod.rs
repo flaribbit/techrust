@@ -1,5 +1,5 @@
 pub mod response;
-use crate::common::{AppState, User};
+use crate::common::{AppState, User, WSSender};
 use axum::extract::{
     ws::{Message, WebSocket, WebSocketUpgrade},
     State,
@@ -38,12 +38,7 @@ async fn websocket(stream: WebSocket, state: Arc<AppState>) {
     println!("disconnected");
 }
 
-type Sender = futures_util::stream::SplitSink<WebSocket, Message>;
-fn handle_message(
-    json: &serde_json::Value,
-    state: &Arc<AppState>,
-    sender: &Arc<tokio::sync::Mutex<Sender>>,
-) {
+fn handle_message(json: &serde_json::Value, state: &Arc<AppState>, sender: &WSSender) {
     let action_id = json["action_id"].as_i64().unwrap_or_default();
     macro_rules! handlers {
         ($($key:expr => $value:ident),* $(,)?) => {

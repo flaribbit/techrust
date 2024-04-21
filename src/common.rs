@@ -3,12 +3,12 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{Arc, Mutex},
 };
-pub type Sender = futures_util::stream::SplitSink<WebSocket, Message>;
+pub type WSSender = Arc<tokio::sync::Mutex<futures_util::stream::SplitSink<WebSocket, Message>>>;
 
 pub struct User {
     pub id: i32,
     pub name: String,
-    pub sender: Arc<tokio::sync::Mutex<Sender>>,
+    pub sender: WSSender,
 }
 
 pub struct Room {
