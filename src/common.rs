@@ -16,27 +16,16 @@ pub struct Room {
     pub users: BTreeSet<i32>,
 }
 
-pub struct MessageData {
-    pub player_id: i32,
-    pub message: String,
-}
-
 pub struct AppState {
     pub online_users: Mutex<BTreeMap<i32, User>>,
     pub rooms: Mutex<Vec<Room>>,
-    pub tx: std::sync::mpsc::Sender<MessageData>,
 }
 
 impl AppState {
-    pub fn new() -> (Self, std::sync::mpsc::Receiver<MessageData>) {
-        let (tx, rx) = std::sync::mpsc::channel::<MessageData>();
-        (
-            Self {
-                online_users: Mutex::new(BTreeMap::new()),
-                rooms: Mutex::new(Vec::new()),
-                tx,
-            },
-            rx,
-        )
+    pub fn new() -> Self {
+        Self {
+            online_users: Mutex::new(BTreeMap::new()),
+            rooms: Mutex::new(Vec::new()),
+        }
     }
 }

@@ -1,35 +1,17 @@
-use crate::common::{AppState, MessageData, WSSender};
+use crate::common::{AppState, WSSender};
 use axum::extract::ws::Message;
 use serde_json::json;
-use std::sync::Arc;
 
-pub async fn sender_task(state: Arc<AppState>, rx: std::sync::mpsc::Receiver<MessageData>) {
+fn send_json(sender: &WSSender, json: &serde_json::Value) {
     use futures_util::SinkExt;
-    while let Ok(MessageData { player_id, message }) = rx.recv() {
-        println!("send message to player: {}", player_id);
-        let message = Message::Text(message);
-        let user_sender = state
-            .online_users
-            .lock()
-            .unwrap()
-            .get(&player_id)
-            .map(|user| user.sender.clone());
-        // 这个锁搞不好会一直锁着全局状态
-        if let Some(sender) = user_sender {
-            sender.lock().await.send(message).await.unwrap();
-        }
-    }
-}
-
-fn send_json(state: &AppState, json: serde_json::Value) {
+    let sender: WSSender = sender.clone();
     let message = Message::Text(json.to_string());
-    state
-        .tx
-        .send(MessageData {
-            player_id: 0,
-            message: json.to_string(),
-        })
-        .unwrap();
+    tokio::spawn(async move {
+        match sender.lock().await.send(message).await {
+            Ok(_) => println!("send json success"),
+            Err(e) => println!("send json error: {}", e),
+        }
+    });
 }
 
 pub fn global_online_count(_json: &serde_json::Value, state: &AppState, sender: &WSSender) {
@@ -39,7 +21,7 @@ pub fn global_online_count(_json: &serde_json::Value, state: &AppState, sender: 
         "errno": 0,
         "data": count
     });
-    send_json(state, data);
+    send_json(sender, &data);
 }
 
 pub fn match_end(json: &serde_json::Value, state: &AppState, sender: &WSSender) {
