@@ -17,10 +17,11 @@ async fn websocket(stream: WebSocket, state: Arc<AppState>) {
     use futures_util::stream::StreamExt;
     let (sender, mut receiver) = stream.split();
     let sender = Arc::new(tokio::sync::Mutex::new(sender));
+    let player_id = 0;
     state.online_users.lock().unwrap().insert(
         0,
         User {
-            id: 0,
+            id: player_id,
             name: "test".to_string(),
             sender: sender.clone(),
         },
@@ -29,7 +30,7 @@ async fn websocket(stream: WebSocket, state: Arc<AppState>) {
         if let Message::Text(text) = message {
             println!("received: {}", text);
             match serde_json::from_str(&text) {
-                Ok(json) => handle_message(&json, &state, &sender),
+                Ok(json) => handle_message(&json, &state, player_id, &sender),
                 Err(e) => println!("error: {}", e),
             }
         }
@@ -38,12 +39,17 @@ async fn websocket(stream: WebSocket, state: Arc<AppState>) {
     println!("disconnected");
 }
 
-fn handle_message(json: &serde_json::Value, state: &Arc<AppState>, sender: &WSSender) {
+fn handle_message(
+    json: &serde_json::Value,
+    state: &Arc<AppState>,
+    player_id: i32,
+    sender: &WSSender,
+) {
     let action_id = json["action_id"].as_i64().unwrap_or_default();
     macro_rules! handlers {
         ($($key:expr => $value:ident),* $(,)?) => {
             match action_id {
-                $( $key => $value(json, state, sender), )*
+                $( $key => $value(json, state, player_id, sender), )*
                 _ => println!("unknown action_id: {}", action_id),
             }
         };
