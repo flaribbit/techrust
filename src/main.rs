@@ -1,15 +1,19 @@
 use axum::{response::Html, routing::get, Router};
-use clap::Parser;
 mod api;
 mod common;
 mod ws;
 
 /// Techmino server written in Rust.
-#[derive(Parser)]
+#[derive(argh::FromArgs)]
 struct Args {
-    /// The address to bind to
-    #[arg(short = 'b', long = "bind", default_value = "127.0.0.1:3000")]
-    addr: String,
+    /// the address to bind to (default: 127.0.0.1:3000)
+    #[argh(
+        option,
+        arg_name = "address",
+        short = 'b',
+        default = "String::from(\"127.0.0.1:3000\")"
+    )]
+    bind: String,
 }
 
 fn api_v1() -> Router {
@@ -28,8 +32,8 @@ async fn async_main() {
         .with_state(app_state)
         .nest("/techmino/api/v1", api_v1());
 
-    let args: Args = Args::parse();
-    let listener = tokio::net::TcpListener::bind(&args.addr).await.unwrap();
+    let args: Args = argh::from_env();
+    let listener = tokio::net::TcpListener::bind(&args.bind).await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
