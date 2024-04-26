@@ -1,7 +1,8 @@
-use axum::{response::Html, routing::get, Router};
 mod api;
 mod common;
 mod ws;
+use axum::{response::Html, routing::get, Router};
+use tracing::{debug, info, warn};
 
 /// Techmino server written in Rust.
 #[derive(argh::FromArgs, serde::Deserialize)]
@@ -40,28 +41,29 @@ fn api_v1() -> Router {
         .merge(api::player::router())
 }
 
-async fn async_main() {
-    use std::sync::Arc;
-    let app_state = Arc::new(common::AppState::new());
+async fn async_main(args: &Args) {
+    let app_state = std::sync::Arc::new(common::AppState::new());
     let app = Router::new()
         .route("/", get(handler))
         .route("/techmino/ws/v1", get(ws::handler))
         .with_state(app_state)
         .nest("/techmino/api/v1", api_v1());
 
-    let args = Args::load();
     let listener = tokio::net::TcpListener::bind(&args.bind).await.unwrap();
-    println!("log level is set to {}", &args.log_level);
-    println!("listening on {}", listener.local_addr().unwrap());
+    info!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
 
 fn main() {
+    let args = Args::load();
+    let log_level: tracing::Level = args.log_level.parse().unwrap();
+    tracing_subscriber::fmt().with_max_level(log_level).init();
+    info!("log level is set to {}", log_level);
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
-        .block_on(async_main());
+        .block_on(async_main(&args));
 }
 
 async fn handler() -> Html<&'static str> {
